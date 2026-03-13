@@ -58,7 +58,7 @@ nano /etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NODE` | `501260` | Your AllStar node number |
-| `DAYS_TO_KEEP` | `9` | Number of days to retain files |
+| `DAYS_TO_KEEP` | `14` | Number of days to retain files |
 | `TARGET_DIR` | `/recordings/${NODE}` | Directory where recordings are stored |
 | `CRON_SCHEDULE` | `0 3 * * 0` | When to run cleanup automatically |
 

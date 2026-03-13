@@ -11,7 +11,7 @@ NODE="501260"
 
 # Number of days to retain recording files
 # Files older than this will be deleted
-DAYS_TO_KEEP=9
+DAYS_TO_KEEP=14
 
 # Directory where recordings are stored
 # Common paths:

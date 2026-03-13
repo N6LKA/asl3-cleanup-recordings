@@ -60,8 +60,8 @@ if [ ! -f "$CONF_FILE" ]; then
         read -p "Node number is required. Enter your AllStar node number: " NODE
     done
 
-    read -p "Number of days to keep recordings [9]: " input_days
-    DAYS_TO_KEEP="${input_days:-9}"
+    read -p "Number of days to keep recordings [14]: " input_days
+    DAYS_TO_KEEP="${input_days:-14}"
 
     read -p "Recording directory [/recordings/${NODE}]: " input_dir
     TARGET_DIR="${input_dir:-/recordings/${NODE}}"
