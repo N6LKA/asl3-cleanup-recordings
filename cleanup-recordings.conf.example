@@ -1,0 +1,29 @@
+# ============================================================
+#  cleanup-recordings.conf
+#
+#  Configuration file for cleanup-recordings.sh
+#  Copy this file to cleanup-recordings.conf and edit as needed.
+#  This file is preserved during updates.
+# ============================================================
+
+# Your AllStar node number
+NODE="501260"
+
+# Number of days to retain recording files
+# Files older than this will be deleted
+DAYS_TO_KEEP=9
+
+# Directory where recordings are stored
+# Common paths:
+#   /recordings/${NODE}                        (ASL3 default)
+#   /var/spool/asterisk/monitor/${NODE}        (ASL3 original)
+#   /media/MS1/${NODE}                         (HamVOIP)
+TARGET_DIR="/recordings/${NODE}"
+
+# Cron schedule for automatic cleanup
+# Format: minute hour day-of-month month day-of-week
+# Examples:
+#   0 3 * * 0   = Every Sunday at 3:00 AM  (default)
+#   0 3 * * *   = Every day at 3:00 AM
+#   0 3 1 * *   = First day of every month at 3:00 AM
+CRON_SCHEDULE="0 3 * * 0"
