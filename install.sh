@@ -113,13 +113,32 @@ source "$CONF_FILE"
 # ====== INSTALL CRON JOB ======
 echo "Installing cron job..."
 
-# Remove any existing entries and associated comment (handles old path/wording variations)
-crontab -l 2>/dev/null | grep -v "cleanup.recordings\|cleanup_recordings\|Cleanup old AllStar recording" | crontab -
+CRON_COMMENT="# Cleanup old AllStar recording files on node $NODE"
+CRON_LINE="$CRON_SCHEDULE $SCRIPT_FILE >/dev/null 2>&1"
+CURRENT_CRON=$(crontab -l 2>/dev/null)
 
-# Add new entry with comment
-(crontab -l 2>/dev/null; echo ""; echo "# Cleanup old AllStar recording files on node $NODE"; echo "$CRON_SCHEDULE $SCRIPT_FILE >/dev/null 2>&1") | crontab -
-
-echo "Cron job installed: $CRON_SCHEDULE"
+if echo "$CURRENT_CRON" | grep -q "cleanup.recordings\|cleanup_recordings"; then
+    # Entry exists — update the cron line and its preceding comment in-place
+    NEW_CRON=$(echo "$CURRENT_CRON" | awk -v comment="$CRON_COMMENT" -v job="$CRON_LINE" '
+        { lines[NR] = $0 }
+        END {
+            for (i = 1; i <= NR; i++) {
+                if (lines[i] ~ /cleanup.recordings|cleanup_recordings/) {
+                    if (i > 1 && lines[i-1] ~ /[Cc]leanup.*[Aa]ll[Ss]tar|[Aa]ll[Ss]tar.*recording/) {
+                        lines[i-1] = comment
+                    }
+                    lines[i] = job
+                }
+            }
+            for (i = 1; i <= NR; i++) print lines[i]
+        }')
+    echo "$NEW_CRON" | crontab -
+    echo "Cron job updated: $CRON_SCHEDULE"
+else
+    # No existing entry — append with blank line, comment, and cron line
+    (crontab -l 2>/dev/null; echo ""; echo "$CRON_COMMENT"; echo "$CRON_LINE") | crontab -
+    echo "Cron job installed: $CRON_SCHEDULE"
+fi
 
 # ====== SET PERMISSIONS ======
 chown -R root:asterisk "$INSTALL_DIR"
