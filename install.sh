@@ -113,8 +113,8 @@ source "$CONF_FILE"
 # ====== INSTALL CRON JOB ======
 echo "Installing cron job..."
 
-# Remove any existing entries (handles migration from old /etc/asterisk/local/ path too)
-crontab -l 2>/dev/null | grep -v "cleanup.recordings\|cleanup_recordings" | crontab -
+# Remove any existing entries and associated comment (handles old path/wording variations)
+crontab -l 2>/dev/null | grep -v "cleanup.recordings\|cleanup_recordings\|Cleanup old AllStar recording" | crontab -
 
 # Add new entry with comment
 (crontab -l 2>/dev/null; echo ""; echo "# Cleanup old AllStar recording files on node $NODE"; echo "$CRON_SCHEDULE $SCRIPT_FILE >/dev/null 2>&1") | crontab -
