@@ -2,52 +2,45 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recordings</title>
-    <link href="css/bootstrap.min.css" rel="stylesheet">
     <style>
-        html, body {
-            background: transparent;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            height: 0;
-        }
-        #archive-link {
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { background: transparent; overflow: hidden; }
+        #link {
             display: none;
-            padding: 0.4rem 0.5rem;
-            white-space: nowrap;
+            padding: 5px 8px;
         }
+        #link a {
+            display: inline-block;
+            padding: 3px 10px;
+            font-size: 13px;
+            color: #adb5bd;
+            border: 1px solid #6c757d;
+            border-radius: 4px;
+            text-decoration: none;
+            font-family: sans-serif;
+        }
+        #link a:hover { color: #fff; border-color: #adb5bd; }
     </style>
 </head>
 <body>
-    <div id="archive-link">
-        <a href="recordings-browser.html" target="_blank"
-           class="btn btn-sm btn-outline-secondary">
-            &#127897; View Archived Recordings
-        </a>
+    <div id="link">
+        <a href="recordings-browser.html" target="_blank">&#127897; View Archived Recordings</a>
     </div>
     <script>
-        function fitToContent() {
-            const h = document.getElementById("archive-link").offsetHeight + 8;
-            document.documentElement.style.height = h + "px";
-            document.body.style.height = h + "px";
-            if (window.frameElement) {
-                window.frameElement.style.height = h + "px";
-                window.frameElement.style.minHeight = h + "px";
-            }
-        }
-
         (async function () {
             try {
                 const r = await fetch("master/auth/check");
                 const data = await r.json();
                 if (data === "Logged In") {
-                    document.getElementById("archive-link").style.display = "block";
-                    requestAnimationFrame(fitToContent);
+                    const el = document.getElementById("link");
+                    el.style.display = "block";
+                    if (window.frameElement) {
+                        window.frameElement.style.height = (el.offsetHeight + 2) + "px";
+                        window.frameElement.style.minHeight = "0";
+                    }
                 }
             } catch (e) {
-                console.error("Archive widget:", e);
+                console.error("Archive widget auth check failed:", e);
             }
         })();
     </script>
