@@ -160,20 +160,46 @@ fetch_repo_file "web/recordings-widget.html"  "$ALLMON3_WEB/recordings-widget.ht
 fetch_repo_file "web/recordings-browser.html" "$ALLMON3_WEB/recordings-browser.html"
 ok "Web pages deployed."
 
-# ── Step 5: nginx location block ─────────────────────────────────────────────
-info "Configuring nginx..."
-[[ -f "$NGINX_CONF" ]] || die "nginx config not found: $NGINX_CONF"
+# ── Step 5: Web server proxy configuration ────────────────────────────────────
+info "Configuring web server proxy..."
 
-if grep -q "$NGINX_MARKER" "$NGINX_CONF"; then
-    ok "nginx location block already present — skipping."
-else
-    BACKUP="${NGINX_CONF}.bak.$(date +%Y%m%d-%H%M%S)"
-    cp "$NGINX_CONF" "$BACKUP"
-    ok "nginx.conf backed up to $BACKUP"
+APACHE_CONF_DIR="/etc/apache2/conf-available"
+APACHE_CONF="$APACHE_CONF_DIR/allmon3-archive.conf"
+APACHE_MARKER="# allmon3-archive: managed"
 
-    # Append location block at end of file (nginx.conf is a bare list of
-    # location blocks included into a server{} elsewhere — no wrapper to insert into)
-    python3 - "$NGINX_CONF" "$NGINX_MARKER" <<'PYEOF'
+if systemctl is-active --quiet apache2 2>/dev/null; then
+    # ── Apache ────────────────────────────────────────────────────────────────
+    info "Apache detected."
+    a2enmod proxy proxy_http &>/dev/null || true
+
+    if [[ -f "$APACHE_CONF" ]] && grep -q "$APACHE_MARKER" "$APACHE_CONF"; then
+        ok "Apache proxy config already present — skipping."
+    else
+        cat > "$APACHE_CONF" <<APEOF
+${APACHE_MARKER}
+ProxyPass /allmon3/archive/ "http://127.0.0.1:8765/archive/"
+APEOF
+        a2enconf allmon3-archive &>/dev/null
+        ok "Apache proxy config installed: $APACHE_CONF"
+    fi
+    apachectl configtest 2>/dev/null || die "Apache config test failed."
+    systemctl reload apache2
+    ok "Apache reloaded."
+
+elif systemctl is-active --quiet nginx 2>/dev/null \
+     || pgrep -x nginx &>/dev/null; then
+    # ── nginx ─────────────────────────────────────────────────────────────────
+    info "nginx detected."
+    [[ -f "$NGINX_CONF" ]] || die "nginx config not found: $NGINX_CONF"
+
+    if grep -q "$NGINX_MARKER" "$NGINX_CONF"; then
+        ok "nginx location block already present — skipping."
+    else
+        BACKUP="${NGINX_CONF}.bak.$(date +%Y%m%d-%H%M%S)"
+        cp "$NGINX_CONF" "$BACKUP"
+        ok "nginx.conf backed up to $BACKUP"
+
+        python3 - "$NGINX_CONF" "$NGINX_MARKER" <<'PYEOF'
 import sys
 path, marker = sys.argv[1], sys.argv[2]
 block = f"""
@@ -187,10 +213,14 @@ content = open(path).read()
 open(path, 'w').write(content.rstrip() + '\n' + block)
 PYEOF
 
-    nginx -t 2>/dev/null || die "nginx config test failed after edit. Restoring backup..." \
-        && cp "$BACKUP" "$NGINX_CONF"
-    nginx -s reload
-    ok "nginx updated and reloaded."
+        NGINX_BIN=$(command -v nginx || echo /usr/sbin/nginx)
+        "$NGINX_BIN" -t 2>/dev/null || { cp "$BACKUP" "$NGINX_CONF"; die "nginx config test failed — backup restored."; }
+        "$NGINX_BIN" -s reload
+        ok "nginx updated and reloaded."
+    fi
+
+else
+    die "Could not detect a running web server (apache2 or nginx). Is Allmon3 installed?"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
