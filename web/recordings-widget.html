@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordings</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: transparent;
+            margin: 0;
+            padding: 0.4rem 0.5rem;
+        }
+        #archive-link { display: none; }
+    </style>
+</head>
+<body>
+    <div id="archive-link">
+        <a href="recordings-browser.html" target="_blank"
+           class="btn btn-sm btn-outline-secondary">
+            &#127897; View Archived Recordings
+        </a>
+    </div>
+    <script>
+        (async function () {
+            try {
+                const r = await fetch("master/auth/check");
+                if (r.ok && await r.json() === "Logged In") {
+                    document.getElementById("archive-link").style.display = "block";
+                }
+            } catch (_) {}
+        })();
+    </script>
+</body>
+</html>
