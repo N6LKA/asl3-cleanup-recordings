@@ -109,10 +109,9 @@ command -v python3 &>/dev/null || die "python3 not found. Install it and re-run.
 ok "Python 3 found: $(python3 --version)"
 
 info "Setting up Python virtual environment..."
-if ! python3 -m venv --help &>/dev/null; then
-    apt-get install -y -qq python3-venv \
-        || die "python3-venv not available. Run: apt install python3-venv"
-fi
+apt-get install -y -qq python3-venv 2>/dev/null \
+    || apt-get install -y -qq "python$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')-venv" \
+    || die "Could not install python3-venv. Run: apt install python3-venv"
 mkdir -p "$INSTALL_DIR"
 python3 -m venv "$INSTALL_DIR/venv"
 ok "Virtual environment created at $INSTALL_DIR/venv"
