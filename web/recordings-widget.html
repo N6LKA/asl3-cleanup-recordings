@@ -31,7 +31,7 @@
             try {
                 const r = await fetch("master/auth/check");
                 const data = await r.json();
-                if (data === "Logged In") {
+                if (data === "Logged In" || data?.SUCCESS === "Logged In") {
                     const el = document.getElementById("link");
                     el.style.display = "block";
                     if (window.frameElement) {
