@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { background: transparent; overflow: hidden; }
+        html, body { background: transparent; overflow: hidden; height: 0; }
         #link {
             display: none;
             padding: 5px 8px;
@@ -27,22 +27,40 @@
         <a href="recordings-browser.html" target="_blank">&#127897; View Archived Recordings</a>
     </div>
     <script>
-        (async function () {
+        var loggedIn = false;
+
+        function setHeight(px) {
+            document.documentElement.style.height = px + "px";
+            document.body.style.height = px + "px";
+            if (window.frameElement) {
+                window.frameElement.style.height = px + "px";
+                window.frameElement.style.minHeight = "0";
+            }
+        }
+
+        async function checkAuth() {
             try {
                 const r = await fetch("master/auth/check");
                 const data = await r.json();
-                if (data === "Logged In" || data?.SUCCESS === "Logged In") {
+                const nowLoggedIn = (data === "Logged In" || data?.SUCCESS === "Logged In");
+
+                if (nowLoggedIn !== loggedIn) {
+                    loggedIn = nowLoggedIn;
                     const el = document.getElementById("link");
-                    el.style.display = "block";
-                    if (window.frameElement) {
-                        window.frameElement.style.height = (el.offsetHeight + 2) + "px";
-                        window.frameElement.style.minHeight = "0";
+                    if (loggedIn) {
+                        el.style.display = "block";
+                        requestAnimationFrame(() => setHeight(el.offsetHeight + 2));
+                    } else {
+                        el.style.display = "none";
+                        setHeight(0);
                     }
                 }
-            } catch (e) {
-                console.error("Archive widget auth check failed:", e);
-            }
-        })();
+            } catch (_) {}
+        }
+
+        // Check immediately, then poll every 5 seconds
+        checkAuth();
+        setInterval(checkAuth, 5000);
     </script>
 </body>
 </html>
