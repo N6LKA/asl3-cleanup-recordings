@@ -6,12 +6,18 @@
     <title>Recordings</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
+        html, body {
             background: transparent;
             margin: 0;
-            padding: 0.4rem 0.5rem;
+            padding: 0;
+            overflow: hidden;
+            height: 0;
         }
-        #archive-link { display: none; }
+        #archive-link {
+            display: none;
+            padding: 0.4rem 0.5rem;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -22,13 +28,27 @@
         </a>
     </div>
     <script>
+        function fitToContent() {
+            const h = document.getElementById("archive-link").offsetHeight + 8;
+            document.documentElement.style.height = h + "px";
+            document.body.style.height = h + "px";
+            if (window.frameElement) {
+                window.frameElement.style.height = h + "px";
+                window.frameElement.style.minHeight = h + "px";
+            }
+        }
+
         (async function () {
             try {
                 const r = await fetch("master/auth/check");
-                if (r.ok && await r.json() === "Logged In") {
+                const data = await r.json();
+                if (data === "Logged In") {
                     document.getElementById("archive-link").style.display = "block";
+                    requestAnimationFrame(fitToContent);
                 }
-            } catch (_) {}
+            } catch (e) {
+                console.error("Archive widget:", e);
+            }
         })();
     </script>
 </body>
