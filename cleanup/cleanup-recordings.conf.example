@@ -20,10 +20,11 @@ DAYS_TO_KEEP=14
 #   /media/MS1/${NODE}                         (HamVOIP)
 TARGET_DIR="/recordings/${NODE}"
 
-# Cron schedule for automatic cleanup
-# Format: minute hour day-of-month month day-of-week
-# Examples:
-#   0 3 * * 0   = Every Sunday at 3:00 AM  (default)
-#   0 3 * * *   = Every day at 3:00 AM
-#   0 3 1 * *   = First day of every month at 3:00 AM
-CRON_SCHEDULE="0 3 * * 0"
+# Cleanup schedule (managed by the allmon3-cleanup daemon service)
+# These fields can also be edited via the Allmon3 archive browser web UI.
+# SCHEDULE_FREQUENCY: daily | weekly | monthly
+SCHEDULE_FREQUENCY=weekly
+# SCHEDULE_DOW: day of week for weekly schedule (0=Sunday … 6=Saturday)
+SCHEDULE_DOW=0
+# SCHEDULE_HOUR: hour of day to run cleanup (0–23, 24-hour clock)
+SCHEDULE_HOUR=3

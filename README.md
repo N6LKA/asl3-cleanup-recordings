@@ -12,7 +12,7 @@ A web-based audio archive browser for AllStarLink 3 repeaters, integrated direct
 - **In-browser playback** — listen to archived transmissions directly in Allmon3, including Chrome
 - **Seamless authentication** — uses your existing Allmon3 login; no separate credentials
 - **Auth-aware widget** — an optional iframe panel shows a link to the archive only when you are logged in to Allmon3
-- **Automatic cleanup** — configurable cron job deletes recordings older than a set number of days
+- **Automatic cleanup** — a background daemon deletes recordings older than a configurable number of days; schedule and retention can be adjusted from the browser UI
 
 ---
 
@@ -26,6 +26,8 @@ A web-based audio archive browser for AllStarLink 3 repeaters, integrated direct
 ---
 
 ## Installation
+
+> **Note:** The installer must be run as **root or with `sudo`**. It installs a background cleanup daemon as a system service, which requires root access at install time. No root access is needed after installation.
 
 ### Stable
 
@@ -70,11 +72,23 @@ http://<your-node>/allmon3/recordings-browser.html
 
 ## Cleanup Configuration
 
-The cleanup scheduler config is at `/etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf`. Edit `DAYS_TO_KEEP` to change the retention period:
+Cleanup settings can be changed directly from the **Settings panel** in the archive browser (right column). The daemon re-reads the config every 60 seconds, so changes take effect almost immediately — no restart required.
+
+You can also edit the config file directly at `/etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf`:
 
 ```bash
-# Number of days to retain recording files
 DAYS_TO_KEEP=14
+SCHEDULE_FREQUENCY=weekly   # daily | weekly | monthly
+SCHEDULE_DOW=0              # 0=Sunday ... 6=Saturday (weekly only)
+SCHEDULE_HOUR=3             # 0–23, 24-hour clock
+```
+
+The cleanup daemon picks up config changes automatically on its next check (within 60 seconds).
+
+To trigger an immediate cleanup from the browser, use the **Run Cleanup Now** button in the Settings panel. To run it manually from the command line:
+
+```bash
+sudo /etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.sh
 ```
 
 Run a test (no deletions) to preview what would be purged:
