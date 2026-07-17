@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Archive</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #212529; color: #dee2e6; }
+
+        .page-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #495057;
+            margin-bottom: 1.5rem;
+        }
+        .page-header h4 { margin: 0; }
+        .page-header p  { margin: 0.25rem 0 0; color: #6c757d; font-size: 0.875rem; }
+
+        .date-group { margin: 0 0 2rem; }
+        .date-header {
+            background: #2c3136;
+            border-left: 3px solid #495057;
+            padding: 0.4rem 0.75rem;
+            border-radius: 3px;
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+            color: #adb5bd;
+        }
+
+        table { font-size: 0.875rem; margin-bottom: 0; }
+        td, th { vertical-align: middle !important; }
+        .col-time  { width: 70px; white-space: nowrap; }
+        .col-size  { width: 80px; white-space: nowrap; color: #6c757d; }
+        .col-play  { width: 90px; text-align: right; }
+
+        .player-row td { padding: 0.5rem 1rem !important; background: #1a1d20 !important; }
+        audio { width: 100%; height: 36px; }
+
+    </style>
+</head>
+<body>
+<div style="max-width: 760px; margin: 0 auto; padding: 0 1rem;">
+    <div class="page-header" style="padding: 1.25rem 0;">
+        <h4 id="page-title">&#127897; Audio Archive</h4>
+        <p>Individual transmission recordings &bull; newest first</p>
+    </div>
+
+    <div id="status" style="padding: 3rem 0; text-align: center;">
+        <div class="spinner-border text-secondary" role="status" id="spinner"></div>
+        <p class="mt-2 text-muted" id="status-text">Loading recordings&hellip;</p>
+    </div>
+
+    <div id="archive-content"></div>
+</div>
+
+<script>
+    function fmtSize(bytes) {
+        return bytes < 1048576
+            ? (bytes / 1024).toFixed(0) + ' KB'
+            : (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function fmtDate(iso) {
+        const d = new Date(iso + 'T12:00:00');
+        return d.toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
+
+    function closeAllPlayers() {
+        document.querySelectorAll('.player-row').forEach(row => {
+            row.style.display = 'none';
+            const a = row.querySelector('audio');
+            a.pause();
+            a.src = '';
+        });
+        document.querySelectorAll('.play-btn').forEach(b => {
+            b.textContent = '▶ Play';
+            b.classList.replace('btn-secondary', 'btn-outline-primary');
+        });
+    }
+
+    function togglePlay(btn, filename) {
+        const dataRow = btn.closest('tr');
+        const playerRow = dataRow.nextElementSibling;
+        const isOpen = playerRow.style.display === 'table-row';
+
+        closeAllPlayers();
+        if (isOpen) return;
+
+        playerRow.style.display = 'table-row';
+        btn.textContent = '⏹ Stop';
+        btn.classList.replace('btn-outline-primary', 'btn-secondary');
+
+        const audio = playerRow.querySelector('audio');
+        audio.src = '/allmon3/archive/api/file/' + encodeURIComponent(filename);
+        audio.play().catch(() => {});
+    }
+
+    function buildContent(records) {
+        const groups = {};
+        records.forEach(r => {
+            (groups[r.date] = groups[r.date] || []).push(r);
+        });
+
+        const frag = document.createDocumentFragment();
+
+        Object.keys(groups).sort().reverse().forEach(date => {
+            const recs = groups[date];
+            const div = document.createElement('div');
+            div.className = 'date-group';
+
+            let html = `<div class="date-header">${fmtDate(date)}`
+                + ` <span class="fw-normal text-muted">`
+                + `(${recs.length} transmission${recs.length !== 1 ? 's' : ''})</span></div>`
+                + `<table class="table table-dark table-hover table-sm">`
+                + `<thead><tr>`
+                + `<th class="col-time">Time</th>`
+                + `<th class="col-size">Size</th>`
+                + `<th class="col-play"></th>`
+                + `</tr></thead><tbody>`;
+
+            recs.forEach(r => {
+                const fn = r.filename.replace(/'/g, "\\'");
+                html += `<tr>`
+                    + `<td class="col-time">${r.time}</td>`
+                    + `<td class="col-size">${fmtSize(r.size)}</td>`
+                    + `<td class="col-play">`
+                    + `<button class="btn btn-sm btn-outline-primary play-btn"`
+                    + ` onclick="togglePlay(this,'${fn}')">&#9654; Play</button>`
+                    + `</td></tr>`
+                    + `<tr class="player-row" style="display:none">`
+                    + `<td colspan="3"><audio controls preload="none"></audio></td>`
+                    + `</tr>`;
+            });
+
+            html += '</tbody></table>';
+            div.innerHTML = html;
+            frag.appendChild(div);
+        });
+
+        document.getElementById('archive-content').appendChild(frag);
+    }
+
+    function setTitle(info) {
+        const node = info && info.node ? info.node : '';
+        const cs   = info && info.callsign ? info.callsign : '';
+        let title;
+        if (cs && node) {
+            title = '\u{1F3A7} ' + cs + ' Audio Archive — Node ' + node;
+        } else if (node) {
+            title = '\u{1F3A7} Node ' + node + ' Audio Archive';
+        } else {
+            title = '\u{1F3A7} Audio Archive';
+        }
+        document.getElementById('page-title').textContent = title;
+        document.title = title.replace(/\u{1F3A7}\s*/u, '');
+    }
+
+    (async function () {
+        try {
+            // Fetch info and list in parallel; both require auth
+            const [infoResp, listResp] = await Promise.all([
+                fetch('/allmon3/archive/api/info'),
+                fetch('/allmon3/archive/api/list'),
+            ]);
+
+            if (listResp.status === 401 || infoResp.status === 401) {
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('status-text').innerHTML =
+                    '<span class="text-warning">&#9888; Please log in to Allmon3 to view recordings.</span>'
+                    + '<br><a href="/allmon3/" class="btn btn-outline-secondary btn-sm mt-2">Go to Allmon3</a>';
+                return;
+            }
+
+            if (!listResp.ok) throw new Error('HTTP ' + listResp.status);
+
+            const [info, data] = await Promise.all([infoResp.json(), listResp.json()]);
+            setTitle(info);
+
+            document.getElementById('status').style.display = 'none';
+
+            if (data.length === 0) {
+                document.getElementById('archive-content').innerHTML =
+                    '<p class="text-muted px-3">No recordings found.</p>';
+            } else {
+                buildContent(data);
+            }
+
+        } catch (e) {
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('status-text').innerHTML =
+                '<span class="text-danger">Error loading recordings: ' + e.message + '</span>';
+        }
+    })();
+</script>
+</body>
+</html>

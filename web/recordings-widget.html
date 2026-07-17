@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { background: transparent; overflow: hidden; height: 0; }
+        #link {
+            display: none;
+            padding: 5px 8px;
+        }
+        #link a {
+            display: inline-block;
+            padding: 3px 10px;
+            font-size: 13px;
+            color: #adb5bd;
+            border: 1px solid #6c757d;
+            border-radius: 4px;
+            text-decoration: none;
+            font-family: sans-serif;
+        }
+        #link a:hover { color: #fff; border-color: #adb5bd; }
+    </style>
+</head>
+<body>
+    <div id="link">
+        <a href="recordings-browser.html" target="_blank">&#127897; View Archived Recordings</a>
+    </div>
+    <script>
+        var loggedIn = false;
+
+        // Synchronously collapse before buildAutoIframe fires on the iframe load event.
+        // buildAutoIframe reads doc.documentElement.scrollHeight — when the iframe is
+        // display:none the layout height is 0, so it sets iframe height=0 instead of
+        // the browser's default ~150px placeholder.
+        if (window.frameElement) {
+            window.frameElement.style.display = "none";
+            window.frameElement.style.height = "0";
+            window.frameElement.style.minHeight = "0";
+        }
+
+        function showFrame(show) {
+            const el = document.getElementById("link");
+            if (show) {
+                if (window.frameElement) window.frameElement.style.display = "";
+                el.style.display = "block";
+                requestAnimationFrame(() => {
+                    const h = el.offsetHeight + 2;
+                    document.documentElement.style.height = h + "px";
+                    document.body.style.height = h + "px";
+                    if (window.frameElement) {
+                        window.frameElement.style.height = h + "px";
+                        window.frameElement.style.minHeight = "0";
+                    }
+                });
+            } else {
+                el.style.display = "none";
+                document.documentElement.style.height = "0";
+                document.body.style.height = "0";
+                if (window.frameElement) {
+                    window.frameElement.style.height = "0";
+                    window.frameElement.style.minHeight = "0";
+                    window.frameElement.style.display = "none";
+                }
+            }
+        }
+
+        async function checkAuth() {
+            try {
+                const r = await fetch("master/auth/check");
+                const data = await r.json();
+                const nowLoggedIn = (data === "Logged In" || data?.SUCCESS === "Logged In");
+                // Always apply — not just on change — so any height buildAutoIframe
+                // may have set gets corrected on the first auth response.
+                loggedIn = nowLoggedIn;
+                showFrame(loggedIn);
+            } catch (_) {}
+        }
+
+        // Check immediately, then poll every 5 seconds
+        checkAuth();
+        setInterval(checkAuth, 5000);
+    </script>
+</body>
+</html>

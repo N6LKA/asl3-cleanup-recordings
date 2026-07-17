@@ -1,149 +1,102 @@
-# ASL3-Cleanup-Recordings
+# ASL3-Audio-Archive
 
-![Release Version](https://img.shields.io/github/v/release/N6LKA/ASL3-Cleanup-Recordings?label=Version&color=f15d24)
-![Release Date](https://img.shields.io/github/release-date/N6LKA/ASL3-Cleanup-Recordings?label=Released&color=f15d24)
-![Hits](https://img.shields.io/endpoint?url=https%3A%2F%2Fhits.dwyl.com%2FN6LKA%2FASL3-Cleanup-Recordings.json&label=Hits&color=f15d24)
-![GitHub Repo Size](https://img.shields.io/github/repo-size/N6LKA/ASL3-Cleanup-Recordings?label=Size&color=f15d24)
+![Release Version](https://img.shields.io/github/v/release/N6LKA/ASL3-Audio-Archive?label=Version&color=f15d24)
+![License](https://img.shields.io/badge/license-GPLv3-lightgrey)
 
-Automatically cleans old AllStar recording files from ASL3 nodes. Deletes `.WAV` and `.txt` recording files older than a configurable number of days, keeping your storage from filling up over time.
+A web-based audio archive browser for AllStarLink 3 repeaters, integrated directly into [Allmon3](https://github.com/AllStarLink/Allmon3). Browse and play every archived transmission from your browser — no SSH required. Also includes the cleanup scheduler to automatically prune old recordings and keep disk usage under control.
 
 ---
 
 ## Features
 
-- Configurable retention period (number of days to keep)
-- Configurable recording directory
-- Configurable cron schedule for automatic cleanup
-- **Test mode** — preview what would be deleted without removing anything
-- Config file preserved across updates
-- Simple one-line install and update
+- **In-browser playback** — listen to archived transmissions directly in Allmon3, including Chrome
+- **Seamless authentication** — uses your existing Allmon3 login; no separate credentials
+- **Auth-aware widget** — an optional iframe panel shows a link to the archive only when you are logged in to Allmon3
+- **Automatic cleanup** — configurable cron job deletes recordings older than a set number of days
 
 ---
 
 ## Requirements
 
-- ASL3 (AllStar Link 3) on Debian/Ubuntu Linux
-- Root / sudo access for installation
-- `curl` (pre-installed on most ASL3 systems)
+- AllStarLink 3 (ASL3) node with audio archiving enabled
+- Allmon3 installed and running
+- Python 3 with pip
+- Root (sudo) access
 
 ---
 
-## Installation & Updates
+## Installation
 
-Run the following command as root or with sudo on your ASL3 node for both fresh installs and updates:
+### Stable
 
 ```bash
-bash <(curl -fsSL -H "Cache-Control: no-cache" https://raw.githubusercontent.com/N6LKA/ASL3-Cleanup-Recordings/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/N6LKA/ASL3-Audio-Archive/main/install.sh | sudo bash
 ```
 
-**Fresh install:** The installer will prompt you to set your node number, retention days, recording directory, and cron schedule, then create your configuration file and install the cron job automatically.
+### Development / Testing
 
-**Updating:** Re-running the same command will update the script to the latest version. Your existing configuration is always preserved — only the script files are replaced.
-
----
-
-## File Locations
-
-| File | Path |
-|------|------|
-| Main script | `/etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.sh` |
-| Configuration | `/etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf` |
-| Config example | `/etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf.example` |
-
----
-
-## Configuration
-
-Edit the config file to customize behavior:
+> ⚠️ **Warning:** `develop` may contain incomplete, untested, or broken features at any given time. Only use this on a system where you can tolerate things breaking (or reinstall from `main` to recover). Don't use it on a repeater or node you depend on for daily use.
 
 ```bash
-nano /etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf
+curl -fsSL "https://github.com/N6LKA/ASL3-Audio-Archive/archive/refs/heads/develop.tar.gz" \
+  | tar -xzO ASL3-Audio-Archive-develop/install.sh \
+  | sudo bash -s -- --branch develop
 ```
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE` | `501260` | Your AllStar node number |
-| `DAYS_TO_KEEP` | `14` | Number of days to retain files |
-| `TARGET_DIR` | `/recordings/${NODE}` | Directory where recordings are stored |
-| `CRON_SCHEDULE` | `0 3 * * 0` | When to run cleanup automatically |
-
-### Common Recording Directory Paths
-
-| System | Path |
-|--------|------|
-| ASL3 (default) | `/recordings/${NODE}` |
-| ASL3 (original) | `/var/spool/asterisk/monitor/${NODE}` |
-| HamVOIP | `/media/MS1/${NODE}` |
-
-### Cron Schedule Examples
-
-| Schedule | Meaning |
-|----------|---------|
-| `0 3 * * 0` | Every Sunday at 3:00 AM (default) |
-| `0 3 * * *` | Every day at 3:00 AM |
-| `0 3 1 * *` | First day of every month at 3:00 AM |
-
-After editing the config, the new cron schedule takes effect on the next installer run (to update the cron job). Retention and directory changes take effect immediately on the next run.
 
 ---
 
-## Usage
+## Post-Install Configuration
 
-### Run manually (normal mode):
-```bash
-sudo /etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.sh
+After the installer finishes, add one line to `/etc/allmon3/allmon3.ini` under your node section to enable the in-page widget:
+
+```ini
+[501260]
+iframepost = recordings-widget.html
 ```
 
-### Run in test mode (no files deleted):
+Then restart Allmon3:
+
+```bash
+sudo systemctl restart allmon3
+```
+
+The archive browser is available directly at:
+
+```
+http://<your-node>/allmon3/recordings-browser.html
+```
+
+---
+
+## Cleanup Configuration
+
+The cleanup scheduler config is at `/etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf`. Edit `DAYS_TO_KEEP` to change the retention period:
+
+```bash
+# Number of days to retain recording files
+DAYS_TO_KEEP=14
+```
+
+Run a test (no deletions) to preview what would be purged:
+
 ```bash
 sudo /etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.sh test
 ```
 
-Test mode output example:
-```
--------------------------------------------
- AllStar Recording Cleanup Utility (TEST MODE)
- Node: 501260
- Directory: /recordings/501260
- Retention: 9 days
- Files before cleanup: 142
--------------------------------------------
-Files that WOULD be deleted:
-/recordings/501260/20250301-142301.WAV
-/recordings/501260/20250301-142301.txt
-...
--------------------------------------------
-Total files that would be deleted: 28
-No files deleted (TEST MODE).
--------------------------------------------
-```
-
 ---
 
-## Uninstalling
-
-To remove the script and cron job manually:
+## Uninstall
 
 ```bash
-# Remove cron job
-crontab -l | grep -v "cleanup-recordings" | crontab -
-
-# Remove files
-sudo rm -rf /etc/asterisk/scripts/cleanup-recordings
+curl -fsSL https://raw.githubusercontent.com/N6LKA/ASL3-Audio-Archive/main/uninstall.sh | sudo bash
 ```
 
----
-
-## Support the Project
-
-If this project has been useful to you, please consider supporting its development!
-
-<p align="center"><a href="https://www.paypal.me/LarryAycock"><img src="https://raw.githubusercontent.com/stefan-niedermann/paypal-donate-button/master/paypal-donate-button.png" width="300px" alt="Donate with PayPal"/></a></p>
+The uninstaller removes the archive browser and backend service. It does **not** remove the cleanup script or any recordings.
 
 ---
 
 ## License
 
-GNU General Public License v3.0 (GPLv3) — Copyright 2026 Larry K. Aycock (N6LKA)
+GPLv3 — see [LICENSE](LICENSE)
 
-See [LICENSE](LICENSE) for details.
+Author: Larry K. Aycock (N6LKA)

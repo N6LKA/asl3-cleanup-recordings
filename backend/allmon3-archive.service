@@ -1,0 +1,15 @@
+[Unit]
+Description=Allmon3 Audio Archive API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/allmon3-archive
+ExecStart=/usr/bin/python3 -m uvicorn archive_api:app --host 127.0.0.1 --port 8765
+Restart=always
+RestartSec=5
+Environment=RECORDINGS_DIR=/recordings/501260
+
+[Install]
+WantedBy=multi-user.target
