@@ -72,7 +72,7 @@ http://<your-node>/allmon3/recordings-browser.html
 
 ## Cleanup Configuration
 
-Cleanup settings can be changed directly from the **Settings panel** in the archive browser (right column). Changes take effect at the next scheduled run.
+Cleanup settings can be changed directly from the **Settings panel** in the archive browser (right column). The daemon re-reads the config every 60 seconds, so changes take effect almost immediately — no restart required.
 
 You can also edit the config file directly at `/etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf`:
 
