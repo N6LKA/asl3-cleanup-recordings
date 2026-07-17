@@ -2,8 +2,10 @@
 """
 ASL3 Audio Archive API
 Serves AllStar transmission recordings with Allmon3 session authentication.
+Converts GSM-encoded WAV files to PCM WAV on the fly for browser playback.
 """
 
+import asyncio
 import os
 import re
 from datetime import datetime
@@ -11,15 +13,34 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 
 app = FastAPI()
 
 RECORDINGS_DIR = Path(os.environ.get("RECORDINGS_DIR", "/recordings/501260"))
 ALLMON3_AUTH_URL = "http://localhost:16080/auth/check"
+SOX_BIN = "/usr/bin/sox"
+RPT_CONF = Path("/etc/asterisk/rpt.conf")
 
 _FILENAME_RE = re.compile(r"^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})\d{4}\.WAV$", re.IGNORECASE)
 _SAFE_NAME_RE = re.compile(r"^[\w\-]+\.WAV$", re.IGNORECASE)
+
+
+def _read_callsign(node_num: str) -> str | None:
+    if not RPT_CONF.exists():
+        return None
+    try:
+        content = RPT_CONF.read_text()
+        # Find [node_num] section then look for callsign = VALUE
+        m = re.search(
+            r"^\[" + re.escape(node_num) + r"\][^\[]*?^callsign\s*=\s*(\S+)",
+            content, re.MULTILINE | re.DOTALL | re.IGNORECASE,
+        )
+        if m:
+            return m.group(1).upper().split(";")[0].strip()
+    except Exception:
+        pass
+    return None
 
 
 async def is_authenticated(request: Request) -> bool:
@@ -32,7 +53,9 @@ async def is_authenticated(request: Request) -> bool:
                 timeout=5.0,
             )
             data = r.json()
-            return data == "Logged In" or (isinstance(data, dict) and data.get("SUCCESS") == "Logged In")
+            return data == "Logged In" or (
+                isinstance(data, dict) and data.get("SUCCESS") == "Logged In"
+            )
     except Exception:
         return False
 
@@ -45,6 +68,17 @@ def parse_filename(name: str) -> datetime | None:
         return datetime(int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]))
     except ValueError:
         return None
+
+
+@app.get("/archive/api/info")
+async def node_info(request: Request):
+    if not await is_authenticated(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    node_num = RECORDINGS_DIR.name
+    return JSONResponse({
+        "node": node_num,
+        "callsign": _read_callsign(node_num),
+    })
 
 
 @app.get("/archive/api/list")
@@ -68,6 +102,36 @@ async def list_recordings(request: Request):
     return JSONResponse(files)
 
 
+async def stream_as_pcm(file_path: Path):
+    """Convert GSM WAV to PCM WAV on the fly via sox and stream the result."""
+    proc = await asyncio.create_subprocess_exec(
+        SOX_BIN, str(file_path),
+        "-t", "wav", "-r", "8000", "-e", "signed-integer", "-b", "16", "-c", "1", "-",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+
+    async def generate():
+        try:
+            while True:
+                chunk = await proc.stdout.read(32768)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+            await proc.wait()
+
+    return StreamingResponse(
+        generate(),
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'inline; filename="{file_path.name}"'},
+    )
+
+
 @app.get("/archive/api/file/{filename}")
 async def serve_file(filename: str, request: Request):
     if not await is_authenticated(request):
@@ -82,8 +146,4 @@ async def serve_file(filename: str, request: Request):
     if not file_path.is_file():
         raise HTTPException(status_code=404, detail="Not found")
 
-    return FileResponse(
-        file_path,
-        media_type="audio/wav",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
-    )
+    return await stream_as_pcm(file_path)

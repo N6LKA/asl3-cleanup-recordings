@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N6LKA Audio Archive</title>
+    <title>Audio Archive</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #212529; color: #dee2e6; }
@@ -42,7 +42,7 @@
 <body>
 <div class="container-fluid px-0">
     <div class="page-header">
-        <h4>&#127897; N6LKA Audio Archive &mdash; Node 501260</h4>
+        <h4 id="page-title">&#127897; Audio Archive</h4>
         <p>Individual transmission recordings &bull; newest first</p>
     </div>
 
@@ -143,11 +143,30 @@
         document.getElementById('archive-content').appendChild(frag);
     }
 
+    function setTitle(info) {
+        const node = info && info.node ? info.node : '';
+        const cs   = info && info.callsign ? info.callsign : '';
+        let title;
+        if (cs && node) {
+            title = '\u{1F3A7} ' + cs + ' Audio Archive — Node ' + node;
+        } else if (node) {
+            title = '\u{1F3A7} Node ' + node + ' Audio Archive';
+        } else {
+            title = '\u{1F3A7} Audio Archive';
+        }
+        document.getElementById('page-title').textContent = title;
+        document.title = title.replace(/\u{1F3A7}\s*/u, '');
+    }
+
     (async function () {
         try {
-            const resp = await fetch('/allmon3/archive/api/list');
+            // Fetch info and list in parallel; both require auth
+            const [infoResp, listResp] = await Promise.all([
+                fetch('/allmon3/archive/api/info'),
+                fetch('/allmon3/archive/api/list'),
+            ]);
 
-            if (resp.status === 401) {
+            if (listResp.status === 401 || infoResp.status === 401) {
                 document.getElementById('spinner').style.display = 'none';
                 document.getElementById('status-text').innerHTML =
                     '<span class="text-warning">&#9888; Please log in to Allmon3 to view recordings.</span>'
@@ -155,9 +174,11 @@
                 return;
             }
 
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            if (!listResp.ok) throw new Error('HTTP ' + listResp.status);
 
-            const data = await resp.json();
+            const [info, data] = await Promise.all([infoResp.json(), listResp.json()]);
+            setTitle(info);
+
             document.getElementById('status').style.display = 'none';
 
             if (data.length === 0) {

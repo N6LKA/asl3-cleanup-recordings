@@ -104,9 +104,14 @@ else
 fi
 
 # ── Step 2: Python virtual environment + dependencies ────────────────────────
-info "Checking Python 3..."
+info "Checking system dependencies..."
 command -v python3 &>/dev/null || die "python3 not found. Install it and re-run."
 ok "Python 3 found: $(python3 --version)"
+command -v sox &>/dev/null || {
+    info "Installing sox (required for audio format conversion)..."
+    apt-get install -y -qq sox || die "Could not install sox. Run: apt install sox"
+}
+ok "sox found: $(sox --version 2>&1 | head -1)"
 
 info "Setting up Python virtual environment..."
 apt-get install -y -qq python3-venv 2>/dev/null \
