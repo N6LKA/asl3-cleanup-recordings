@@ -29,6 +29,16 @@
     <script>
         var loggedIn = false;
 
+        // Synchronously collapse before buildAutoIframe fires on the iframe load event.
+        // buildAutoIframe reads doc.documentElement.scrollHeight — when the iframe is
+        // display:none the layout height is 0, so it sets iframe height=0 instead of
+        // the browser's default ~150px placeholder.
+        if (window.frameElement) {
+            window.frameElement.style.display = "none";
+            window.frameElement.style.height = "0";
+            window.frameElement.style.minHeight = "0";
+        }
+
         function showFrame(show) {
             const el = document.getElementById("link");
             if (show) {
@@ -60,10 +70,10 @@
                 const r = await fetch("master/auth/check");
                 const data = await r.json();
                 const nowLoggedIn = (data === "Logged In" || data?.SUCCESS === "Logged In");
-                if (nowLoggedIn !== loggedIn) {
-                    loggedIn = nowLoggedIn;
-                    showFrame(loggedIn);
-                }
+                // Always apply — not just on change — so any height buildAutoIframe
+                // may have set gets corrected on the first auth response.
+                loggedIn = nowLoggedIn;
+                showFrame(loggedIn);
             } catch (_) {}
         }
 
