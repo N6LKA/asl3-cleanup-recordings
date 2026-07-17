@@ -9,14 +9,24 @@
         body { background-color: #212529; color: #dee2e6; }
 
         .page-header {
-            padding: 1.25rem 1.5rem;
+            padding: 1.25rem 0 1rem;
             border-bottom: 1px solid #495057;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
         .page-header h4 { margin: 0; }
         .page-header p  { margin: 0.25rem 0 0; color: #6c757d; font-size: 0.875rem; }
 
-        .date-group { margin: 0 0 2rem; }
+        /* two-column layout */
+        .layout { display: flex; gap: 1.5rem; align-items: flex-start; }
+        .col-archive  { flex: 1; min-width: 0; }
+        .col-settings { width: 270px; flex-shrink: 0; }
+        @media (max-width: 767px) {
+            .layout { flex-direction: column; }
+            .col-settings { width: 100%; }
+        }
+
+        /* recordings list */
+        .date-group { margin: 0 0 1.75rem; }
         .date-header {
             background: #2c3136;
             border-left: 3px solid #495057;
@@ -26,72 +36,194 @@
             font-size: 0.85rem;
             color: #adb5bd;
         }
-
         table { font-size: 0.875rem; margin-bottom: 0; }
         td, th { vertical-align: middle !important; }
-        .col-time  { width: 70px; white-space: nowrap; }
-        .col-size  { width: 80px; white-space: nowrap; color: #6c757d; }
-        .col-play  { width: 90px; text-align: right; }
-
+        .col-time { width: 70px; white-space: nowrap; }
+        .col-size { width: 80px; white-space: nowrap; color: #6c757d; }
+        .col-play { width: 90px; text-align: right; }
         .player-row td { padding: 0.5rem 1rem !important; background: #1a1d20 !important; }
         audio { width: 100%; height: 36px; }
+        #status { padding: 3rem 0; text-align: center; }
 
+        /* settings panel */
+        .settings-card {
+            background: #2c3136;
+            border: 1px solid #495057;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+        .settings-card h6 {
+            color: #adb5bd;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #495057;
+        }
+        .settings-card label {
+            font-size: 0.8rem;
+            color: #adb5bd;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        .settings-card .form-control,
+        .settings-card .form-select {
+            background: #1a1d20;
+            color: #dee2e6;
+            border-color: #495057;
+            font-size: 0.85rem;
+        }
+        .settings-card .form-control:focus,
+        .settings-card .form-select:focus {
+            background: #1a1d20;
+            color: #dee2e6;
+            border-color: #6c757d;
+            box-shadow: none;
+        }
+        .days-row { display: flex; align-items: center; gap: 0.5rem; }
+        .days-row input { width: 80px; }
+        .days-row span  { color: #6c757d; font-size: 0.85rem; }
+        #save-status, #run-status {
+            font-size: 0.8rem;
+            min-height: 1.2em;
+            margin-top: 0.4rem;
+        }
+        .settings-footer {
+            margin-top: 0.75rem;
+            font-size: 0.72rem;
+            color: #6c757d;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
-<div style="max-width: 760px; margin: 0 auto; padding: 0 1rem;">
-    <div class="page-header" style="padding: 1.25rem 0;">
+<div style="max-width: 1100px; margin: 0 auto; padding: 0 1rem;">
+
+    <div class="page-header">
         <h4 id="page-title">&#127897; Audio Archive</h4>
         <p>Individual transmission recordings &bull; newest first</p>
     </div>
 
-    <div id="status" style="padding: 3rem 0; text-align: center;">
-        <div class="spinner-border text-secondary" role="status" id="spinner"></div>
-        <p class="mt-2 text-muted" id="status-text">Loading recordings&hellip;</p>
-    </div>
+    <div class="layout">
 
-    <div id="archive-content"></div>
+        <!-- recordings list -->
+        <div class="col-archive">
+            <div id="status">
+                <div class="spinner-border text-secondary" role="status" id="spinner"></div>
+                <p class="mt-2 text-muted" id="status-text">Loading recordings&hellip;</p>
+            </div>
+            <div id="archive-content"></div>
+        </div>
+
+        <!-- settings panel -->
+        <div class="col-settings">
+            <div class="settings-card" id="settings-panel" style="display:none">
+                <h6>Cleanup Settings</h6>
+
+                <div class="mb-3">
+                    <label>Keep recordings for</label>
+                    <div class="days-row">
+                        <input type="number" id="days-to-keep" class="form-control"
+                               min="1" max="365" value="14">
+                        <span>days</span>
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <label>Cleanup frequency</label>
+                    <select id="sched-freq" class="form-select" onchange="updateSchedUI()">
+                        <option value="daily">Daily</option>
+                        <option value="weekly" selected>Weekly</option>
+                        <option value="monthly">Monthly (1st of month)</option>
+                    </select>
+                </div>
+
+                <div class="mb-2" id="dow-group">
+                    <label>Day of week</label>
+                    <select id="sched-dow" class="form-select">
+                        <option value="0">Sunday</option>
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label>Run at</label>
+                    <select id="sched-hour" class="form-select"></select>
+                </div>
+
+                <button class="btn btn-sm btn-primary w-100"
+                        onclick="saveSettings()">Save Settings</button>
+                <div id="save-status"></div>
+
+                <hr style="border-color:#495057; margin: 0.9rem 0;">
+
+                <button class="btn btn-sm btn-outline-warning w-100"
+                        onclick="runNow()">Run Cleanup Now</button>
+                <div id="run-status"></div>
+
+                <div class="settings-footer" id="settings-footer"></div>
+            </div>
+        </div>
+
+    </div>
 </div>
 
 <script>
-    function fmtSize(bytes) {
-        return bytes < 1048576
-            ? (bytes / 1024).toFixed(0) + ' KB'
-            : (bytes / 1048576).toFixed(1) + ' MB';
+    // build hour dropdown
+    (function () {
+        const sel = document.getElementById('sched-hour');
+        const labels = ['12:00 AM (midnight)','1:00 AM','2:00 AM','3:00 AM',
+                        '4:00 AM','5:00 AM','6:00 AM','7:00 AM','8:00 AM',
+                        '9:00 AM','10:00 AM','11:00 AM','12:00 PM (noon)',
+                        '1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM',
+                        '6:00 PM','7:00 PM','8:00 PM','9:00 PM','10:00 PM','11:00 PM'];
+        labels.forEach((label, h) => {
+            const o = document.createElement('option');
+            o.value = h; o.textContent = label;
+            sel.appendChild(o);
+        });
+    })();
+
+    function updateSchedUI() {
+        document.getElementById('dow-group').style.display =
+            document.getElementById('sched-freq').value === 'weekly' ? '' : 'none';
     }
 
+    // recordings list helpers
+    function fmtSize(b) {
+        return b < 1048576 ? (b/1024).toFixed(0)+' KB' : (b/1048576).toFixed(1)+' MB';
+    }
     function fmtDate(iso) {
-        const d = new Date(iso + 'T12:00:00');
-        return d.toLocaleDateString('en-US', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
+        return new Date(iso+'T12:00:00').toLocaleDateString('en-US',
+            {weekday:'long',year:'numeric',month:'long',day:'numeric'});
     }
 
     function closeAllPlayers() {
         document.querySelectorAll('.player-row').forEach(row => {
             row.style.display = 'none';
-            const a = row.querySelector('audio');
-            a.pause();
-            a.src = '';
+            const a = row.querySelector('audio'); a.pause(); a.src = '';
         });
         document.querySelectorAll('.play-btn').forEach(b => {
             b.textContent = '▶ Play';
-            b.classList.replace('btn-secondary', 'btn-outline-primary');
+            b.classList.replace('btn-secondary','btn-outline-primary');
         });
     }
 
     function togglePlay(btn, filename) {
-        const dataRow = btn.closest('tr');
-        const playerRow = dataRow.nextElementSibling;
-        const isOpen = playerRow.style.display === 'table-row';
-
+        const playerRow = btn.closest('tr').nextElementSibling;
+        const isOpen    = playerRow.style.display === 'table-row';
         closeAllPlayers();
         if (isOpen) return;
-
         playerRow.style.display = 'table-row';
         btn.textContent = '⏹ Stop';
-        btn.classList.replace('btn-outline-primary', 'btn-secondary');
-
+        btn.classList.replace('btn-outline-primary','btn-secondary');
         const audio = playerRow.querySelector('audio');
         audio.src = '/allmon3/archive/api/file/' + encodeURIComponent(filename);
         audio.play().catch(() => {});
@@ -99,70 +231,115 @@
 
     function buildContent(records) {
         const groups = {};
-        records.forEach(r => {
-            (groups[r.date] = groups[r.date] || []).push(r);
-        });
-
+        records.forEach(r => { (groups[r.date] = groups[r.date] || []).push(r); });
         const frag = document.createDocumentFragment();
-
         Object.keys(groups).sort().reverse().forEach(date => {
             const recs = groups[date];
-            const div = document.createElement('div');
+            const div  = document.createElement('div');
             div.className = 'date-group';
-
             let html = `<div class="date-header">${fmtDate(date)}`
                 + ` <span class="fw-normal text-muted">`
-                + `(${recs.length} transmission${recs.length !== 1 ? 's' : ''})</span></div>`
+                + `(${recs.length} transmission${recs.length!==1?'s':''})</span></div>`
                 + `<table class="table table-dark table-hover table-sm">`
-                + `<thead><tr>`
-                + `<th class="col-time">Time</th>`
-                + `<th class="col-size">Size</th>`
-                + `<th class="col-play"></th>`
+                + `<thead><tr><th class="col-time">Time</th>`
+                + `<th class="col-size">Size</th><th class="col-play"></th>`
                 + `</tr></thead><tbody>`;
-
             recs.forEach(r => {
-                const fn = r.filename.replace(/'/g, "\\'");
+                const fn = r.filename.replace(/'/g,"\\'");
                 html += `<tr>`
                     + `<td class="col-time">${r.time}</td>`
                     + `<td class="col-size">${fmtSize(r.size)}</td>`
-                    + `<td class="col-play">`
-                    + `<button class="btn btn-sm btn-outline-primary play-btn"`
-                    + ` onclick="togglePlay(this,'${fn}')">&#9654; Play</button>`
-                    + `</td></tr>`
+                    + `<td class="col-play"><button class="btn btn-sm btn-outline-primary play-btn"`
+                    + ` onclick="togglePlay(this,'${fn}')">&#9654; Play</button></td></tr>`
                     + `<tr class="player-row" style="display:none">`
-                    + `<td colspan="3"><audio controls preload="none"></audio></td>`
-                    + `</tr>`;
+                    + `<td colspan="3"><audio controls preload="none"></audio></td></tr>`;
             });
-
             html += '</tbody></table>';
             div.innerHTML = html;
             frag.appendChild(div);
         });
-
         document.getElementById('archive-content').appendChild(frag);
+    }
+
+    // settings panel
+    function populateSettings(data) {
+        document.getElementById('days-to-keep').value = data.days_to_keep;
+        document.getElementById('sched-freq').value   = data.schedule_frequency || 'weekly';
+        document.getElementById('sched-dow').value    = data.schedule_dow ?? 0;
+        document.getElementById('sched-hour').value   = data.schedule_hour ?? 3;
+        updateSchedUI();
+        const footer = document.getElementById('settings-footer');
+        if (data.conf_exists) {
+            footer.textContent = 'Config: /etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf';
+        } else {
+            footer.innerHTML = '<span class="text-warning">&#9888; Config file not found — re-run installer.</span>';
+        }
+        document.getElementById('settings-panel').style.display = '';
+    }
+
+    async function saveSettings() {
+        const status = document.getElementById('save-status');
+        status.textContent = 'Saving…'; status.className = 'text-muted';
+        try {
+            const resp = await fetch('/allmon3/archive/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    days_to_keep:       parseInt(document.getElementById('days-to-keep').value),
+                    schedule_frequency: document.getElementById('sched-freq').value,
+                    schedule_dow:       parseInt(document.getElementById('sched-dow').value),
+                    schedule_hour:      parseInt(document.getElementById('sched-hour').value),
+                }),
+            });
+            if (resp.ok) {
+                status.textContent = '✓ Saved'; status.className = 'text-success';
+            } else {
+                const err = await resp.json().catch(() => ({}));
+                status.textContent = 'Error: ' + (err.detail || resp.status);
+                status.className = 'text-danger';
+            }
+        } catch (e) {
+            status.textContent = 'Error: ' + e.message; status.className = 'text-danger';
+        }
+        setTimeout(() => { status.textContent = ''; }, 4000);
+    }
+
+    async function runNow() {
+        const status = document.getElementById('run-status');
+        status.textContent = 'Signaling…'; status.className = 'text-muted';
+        try {
+            const resp = await fetch('/allmon3/archive/api/run-cleanup', {method:'POST'});
+            if (resp.ok) {
+                status.textContent = '✓ Triggered — runs within ~60 s';
+                status.className = 'text-success';
+            } else {
+                const err = await resp.json().catch(() => ({}));
+                status.textContent = 'Error: ' + (err.detail || resp.status);
+                status.className = 'text-danger';
+            }
+        } catch (e) {
+            status.textContent = 'Error: ' + e.message; status.className = 'text-danger';
+        }
+        setTimeout(() => { status.textContent = ''; }, 6000);
     }
 
     function setTitle(info) {
         const node = info && info.node ? info.node : '';
         const cs   = info && info.callsign ? info.callsign : '';
         let title;
-        if (cs && node) {
-            title = '\u{1F3A7} ' + cs + ' Audio Archive — Node ' + node;
-        } else if (node) {
-            title = '\u{1F3A7} Node ' + node + ' Audio Archive';
-        } else {
-            title = '\u{1F3A7} Audio Archive';
-        }
+        if (cs && node)  title = '\u{1F3A7} ' + cs + ' Audio Archive — Node ' + node;
+        else if (node)   title = '\u{1F3A7} Node ' + node + ' Audio Archive';
+        else             title = '\u{1F3A7} Audio Archive';
         document.getElementById('page-title').textContent = title;
         document.title = title.replace(/\u{1F3A7}\s*/u, '');
     }
 
     (async function () {
         try {
-            // Fetch info and list in parallel; both require auth
-            const [infoResp, listResp] = await Promise.all([
+            const [infoResp, listResp, settingsResp] = await Promise.all([
                 fetch('/allmon3/archive/api/info'),
                 fetch('/allmon3/archive/api/list'),
+                fetch('/allmon3/archive/api/settings'),
             ]);
 
             if (listResp.status === 401 || infoResp.status === 401) {
@@ -175,17 +352,22 @@
 
             if (!listResp.ok) throw new Error('HTTP ' + listResp.status);
 
-            const [info, data] = await Promise.all([infoResp.json(), listResp.json()]);
-            setTitle(info);
+            const [info, data, settings] = await Promise.all([
+                infoResp.json(), listResp.json(),
+                settingsResp.ok ? settingsResp.json() : Promise.resolve(null),
+            ]);
 
+            setTitle(info);
             document.getElementById('status').style.display = 'none';
 
             if (data.length === 0) {
                 document.getElementById('archive-content').innerHTML =
-                    '<p class="text-muted px-3">No recordings found.</p>';
+                    '<p class="text-muted">No recordings found.</p>';
             } else {
                 buildContent(data);
             }
+
+            if (settings) populateSettings(settings);
 
         } catch (e) {
             document.getElementById('spinner').style.display = 'none';
