@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 app = FastAPI()
 
 RECORDINGS_DIR = Path(os.environ.get("RECORDINGS_DIR", "/recordings/501260"))
-ALLMON3_AUTH_URL = "http://localhost:16080/master/auth/check"
+ALLMON3_AUTH_URL = "http://localhost:16080/auth/check"
 
 _FILENAME_RE = re.compile(r"^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})\d{4}\.WAV$", re.IGNORECASE)
 _SAFE_NAME_RE = re.compile(r"^[\w\-]+\.WAV$", re.IGNORECASE)
