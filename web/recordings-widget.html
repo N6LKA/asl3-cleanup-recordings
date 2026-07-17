@@ -29,12 +29,29 @@
     <script>
         var loggedIn = false;
 
-        function setHeight(px) {
-            document.documentElement.style.height = px + "px";
-            document.body.style.height = px + "px";
-            if (window.frameElement) {
-                window.frameElement.style.height = px + "px";
-                window.frameElement.style.minHeight = "0";
+        function showFrame(show) {
+            const el = document.getElementById("link");
+            if (show) {
+                if (window.frameElement) window.frameElement.style.display = "";
+                el.style.display = "block";
+                requestAnimationFrame(() => {
+                    const h = el.offsetHeight + 2;
+                    document.documentElement.style.height = h + "px";
+                    document.body.style.height = h + "px";
+                    if (window.frameElement) {
+                        window.frameElement.style.height = h + "px";
+                        window.frameElement.style.minHeight = "0";
+                    }
+                });
+            } else {
+                el.style.display = "none";
+                document.documentElement.style.height = "0";
+                document.body.style.height = "0";
+                if (window.frameElement) {
+                    window.frameElement.style.height = "0";
+                    window.frameElement.style.minHeight = "0";
+                    window.frameElement.style.display = "none";
+                }
             }
         }
 
@@ -43,17 +60,9 @@
                 const r = await fetch("master/auth/check");
                 const data = await r.json();
                 const nowLoggedIn = (data === "Logged In" || data?.SUCCESS === "Logged In");
-
                 if (nowLoggedIn !== loggedIn) {
                     loggedIn = nowLoggedIn;
-                    const el = document.getElementById("link");
-                    if (loggedIn) {
-                        el.style.display = "block";
-                        requestAnimationFrame(() => setHeight(el.offsetHeight + 2));
-                    } else {
-                        el.style.display = "none";
-                        setHeight(0);
-                    }
+                    showFrame(loggedIn);
                 }
             } catch (_) {}
         }
