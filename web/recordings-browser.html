@@ -44,8 +44,20 @@
         table { font-size: 0.875rem; margin-bottom: 0; }
         td, th { vertical-align: middle !important; }
         .col-time { width: 70px; white-space: nowrap; }
+        .col-dur  { width: 60px; white-space: nowrap; color: #adb5bd; }
         .col-size { width: 80px; white-space: nowrap; color: #6c757d; }
         .col-play { width: 185px; text-align: right; white-space: nowrap; }
+        .list-controls {
+            font-size: 0.8rem;
+            margin-bottom: 0.6rem;
+            display: none;
+        }
+        .list-controls button {
+            background: none; border: none; padding: 0;
+            color: #6c757d; cursor: pointer; font-size: inherit;
+        }
+        .list-controls button:hover { color: #adb5bd; }
+        .disk-usage { font-size: 0.8rem; color: #6c757d; margin-bottom: 0.75rem; }
         .player-row td { padding: 0.5rem 1rem !important; background: #1a1d20 !important; }
         audio { width: 100%; height: 36px; }
         #status { padding: 3rem 0; text-align: center; }
@@ -115,6 +127,11 @@
 
         <!-- recordings list -->
         <div class="col-archive">
+            <div class="list-controls" id="list-controls">
+                <button onclick="expandAll()">expand all</button>
+                <span style="color:#495057; margin:0 0.35rem">·</span>
+                <button onclick="collapseAll()">collapse all</button>
+            </div>
             <div id="status">
                 <div class="spinner-border text-secondary" role="status" id="spinner"></div>
                 <p class="mt-2 text-muted" id="status-text">Loading recordings&hellip;</p>
@@ -126,6 +143,7 @@
         <div class="col-settings">
             <div class="settings-card" id="settings-panel" style="display:none">
                 <h6>Cleanup Settings</h6>
+                <div class="disk-usage" id="disk-usage"></div>
 
                 <div class="mb-3">
                     <label>Keep recordings for</label>
@@ -181,18 +199,16 @@
 </div>
 
 <script>
-    // build hour dropdown
+    // ── Hour dropdown ────────────────────────────────────────────────────────────
     (function () {
         const sel = document.getElementById('sched-hour');
-        const labels = ['12:00 AM (midnight)','1:00 AM','2:00 AM','3:00 AM',
-                        '4:00 AM','5:00 AM','6:00 AM','7:00 AM','8:00 AM',
-                        '9:00 AM','10:00 AM','11:00 AM','12:00 PM (noon)',
-                        '1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM',
-                        '6:00 PM','7:00 PM','8:00 PM','9:00 PM','10:00 PM','11:00 PM'];
-        labels.forEach((label, h) => {
+        ['12:00 AM (midnight)','1:00 AM','2:00 AM','3:00 AM','4:00 AM','5:00 AM',
+         '6:00 AM','7:00 AM','8:00 AM','9:00 AM','10:00 AM','11:00 AM',
+         '12:00 PM (noon)','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM',
+         '6:00 PM','7:00 PM','8:00 PM','9:00 PM','10:00 PM','11:00 PM'
+        ].forEach((label, h) => {
             const o = document.createElement('option');
-            o.value = h; o.textContent = label;
-            sel.appendChild(o);
+            o.value = h; o.textContent = label; sel.appendChild(o);
         });
     })();
 
@@ -201,7 +217,7 @@
             document.getElementById('sched-freq').value === 'weekly' ? '' : 'none';
     }
 
-    // recordings list helpers
+    // ── Formatting helpers ───────────────────────────────────────────────────────
     function fmtSize(b) {
         return b < 1048576 ? (b/1024).toFixed(0)+' KB' : (b/1048576).toFixed(1)+' MB';
     }
@@ -209,7 +225,19 @@
         return new Date(iso+'T12:00:00').toLocaleDateString('en-US',
             {weekday:'long',year:'numeric',month:'long',day:'numeric'});
     }
+    function fmtDur(s) {
+        if (s == null || s <= 0) return '—';
+        const m = Math.floor(s / 60), sec = Math.round(s % 60);
+        return m + ':' + String(sec).padStart(2, '0');
+    }
+    function fmtBytes(b) {
+        if (b == null) return '—';
+        if (b >= 1e9)  return (b / 1e9).toFixed(1) + ' GB';
+        if (b >= 1e6)  return (b / 1e6).toFixed(1) + ' MB';
+        return (b / 1e3).toFixed(0) + ' KB';
+    }
 
+    // ── Date group collapse ──────────────────────────────────────────────────────
     function toggleGroup(header) {
         const body = header.nextElementSibling;
         const chevron = header.querySelector('.chevron');
@@ -218,6 +246,20 @@
         chevron.textContent = collapsed ? '▾' : '▸';
     }
 
+    function expandAll() {
+        document.querySelectorAll('.date-group').forEach(g => {
+            g.querySelector('.group-body').style.display = '';
+            g.querySelector('.chevron').textContent = '▾';
+        });
+    }
+    function collapseAll() {
+        document.querySelectorAll('.date-group').forEach(g => {
+            g.querySelector('.group-body').style.display = 'none';
+            g.querySelector('.chevron').textContent = '▸';
+        });
+    }
+
+    // ── Audio player ─────────────────────────────────────────────────────────────
     function closeAllPlayers() {
         document.querySelectorAll('.player-row').forEach(row => {
             row.style.display = 'none';
@@ -242,56 +284,123 @@
         audio.play().catch(() => {});
     }
 
+    // ── Recordings list ──────────────────────────────────────────────────────────
+    const knownFilenames = new Set();
+
+    function buildRowHtml(r) {
+        const fn  = r.filename.replace(/'/g, "\\'");
+        const url = '/allmon3/archive/api/file/' + encodeURIComponent(r.filename);
+        return `<tr>`
+            + `<td class="col-time">${r.time}</td>`
+            + `<td class="col-dur">${fmtDur(r.duration)}</td>`
+            + `<td class="col-size">${fmtSize(r.size)}</td>`
+            + `<td class="col-play">`
+            + `<button class="btn btn-sm btn-outline-primary play-btn" onclick="togglePlay(this,'${fn}')">&#9654; Play</button>`
+            + ` <a class="btn btn-sm btn-outline-secondary" href="${url}" download="${r.filename}" title="Download">&#11015;</a>`
+            + `</td></tr>`
+            + `<tr class="player-row" style="display:none"><td colspan="4"><audio controls preload="none"></audio></td></tr>`;
+    }
+
+    function createGroupDiv(date, recs, expanded) {
+        const div = document.createElement('div');
+        div.className    = 'date-group';
+        div.dataset.date = date;
+        let html = `<div class="date-header" onclick="toggleGroup(this)">`
+            + `<span class="chevron">${expanded ? '▾' : '▸'}</span> ${fmtDate(date)}`
+            + ` <span class="fw-normal text-muted rec-count">`
+            + `(${recs.length} transmission${recs.length !== 1 ? 's' : ''})</span></div>`
+            + `<div class="group-body" style="display:${expanded ? '' : 'none'}">`
+            + `<table class="table table-dark table-hover table-sm">`
+            + `<thead><tr><th class="col-time">Time</th><th class="col-dur">Duration</th>`
+            + `<th class="col-size">Size</th><th class="col-play"></th>`
+            + `</tr></thead><tbody>`;
+        recs.forEach(r => { html += buildRowHtml(r); });
+        html += '</tbody></table></div>';
+        div.innerHTML = html;
+        return div;
+    }
+
     function buildContent(records) {
-        const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+        const today = new Date().toLocaleDateString('en-CA');
         const groups = {};
-        records.forEach(r => { (groups[r.date] = groups[r.date] || []).push(r); });
+        records.forEach(r => {
+            knownFilenames.add(r.filename);
+            (groups[r.date] = groups[r.date] || []).push(r);
+        });
         const frag = document.createDocumentFragment();
         Object.keys(groups).sort().reverse().forEach(date => {
-            const isToday  = date === today;
-            const chevron  = isToday ? '▾' : '▸';
-            const bodyDisp = isToday ? '' : 'none';
-            const recs     = groups[date];
-            const div      = document.createElement('div');
-            div.className  = 'date-group';
-            let html = `<div class="date-header" onclick="toggleGroup(this)">`
-                + `<span class="chevron">${chevron}</span> ${fmtDate(date)}`
-                + ` <span class="fw-normal text-muted">`
-                + `(${recs.length} transmission${recs.length!==1?'s':''})</span></div>`
-                + `<div class="group-body" style="display:${bodyDisp}">`
-                + `<table class="table table-dark table-hover table-sm">`
-                + `<thead><tr><th class="col-time">Time</th>`
-                + `<th class="col-size">Size</th><th class="col-play"></th>`
-                + `</tr></thead><tbody>`;
-            recs.forEach(r => {
-                const fn  = r.filename.replace(/'/g,"\\'");
-                const url = '/allmon3/archive/api/file/' + encodeURIComponent(r.filename);
-                html += `<tr>`
-                    + `<td class="col-time">${r.time}</td>`
-                    + `<td class="col-size">${fmtSize(r.size)}</td>`
-                    + `<td class="col-play">`
-                    + `<button class="btn btn-sm btn-outline-primary play-btn"`
-                    + ` onclick="togglePlay(this,'${fn}')">&#9654; Play</button>`
-                    + ` <a class="btn btn-sm btn-outline-secondary" href="${url}"`
-                    + ` download="${r.filename}" title="Download">&#11015;</a>`
-                    + `</td></tr>`
-                    + `<tr class="player-row" style="display:none">`
-                    + `<td colspan="3"><audio controls preload="none"></audio></td></tr>`;
-            });
-            html += '</tbody></table></div>';
-            div.innerHTML = html;
-            frag.appendChild(div);
+            frag.appendChild(createGroupDiv(date, groups[date], date === today));
         });
         document.getElementById('archive-content').appendChild(frag);
     }
 
-    // settings panel
+    // ── Auto-refresh ─────────────────────────────────────────────────────────────
+    async function refreshRecordings() {
+        try {
+            const resp = await fetch('/allmon3/archive/api/list');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const newRecords = data.filter(r => !knownFilenames.has(r.filename));
+            if (newRecords.length === 0) return;
+
+            const today   = new Date().toLocaleDateString('en-CA');
+            const content = document.getElementById('archive-content');
+            const byDate  = {};
+            newRecords.forEach(r => {
+                knownFilenames.add(r.filename);
+                (byDate[r.date] = byDate[r.date] || []).push(r);
+            });
+
+            Object.keys(byDate).sort().reverse().forEach(date => {
+                const recs     = byDate[date].sort((a, b) => b.filename.localeCompare(a.filename));
+                const existing = content.querySelector(`.date-group[data-date="${date}"]`);
+                if (existing) {
+                    const tbody = existing.querySelector('tbody');
+                    recs.forEach(r => {
+                        const tmp = document.createElement('table');
+                        tmp.innerHTML = '<tbody>' + buildRowHtml(r) + '</tbody>';
+                        const src = tmp.querySelector('tbody');
+                        while (src.firstChild) tbody.insertBefore(src.firstChild, tbody.firstChild);
+                    });
+                    const total = tbody.querySelectorAll('tr:not(.player-row)').length;
+                    existing.querySelector('.rec-count').textContent =
+                        `(${total} transmission${total !== 1 ? 's' : ''})`;
+                    if (date === today) {
+                        const body = existing.querySelector('.group-body');
+                        if (body.style.display === 'none') {
+                            body.style.display = '';
+                            existing.querySelector('.chevron').textContent = '▾';
+                        }
+                    }
+                } else {
+                    const newDiv = createGroupDiv(date, recs, date === today);
+                    const groups = content.querySelectorAll('.date-group');
+                    let inserted = false;
+                    for (const g of groups) {
+                        if (g.dataset.date < date) {
+                            content.insertBefore(newDiv, g); inserted = true; break;
+                        }
+                    }
+                    if (!inserted) content.appendChild(newDiv);
+                }
+            });
+        } catch (e) { /* silently ignore */ }
+    }
+
+    // ── Settings panel ───────────────────────────────────────────────────────────
     function populateSettings(data) {
         document.getElementById('days-to-keep').value = data.days_to_keep;
         document.getElementById('sched-freq').value   = data.schedule_frequency || 'weekly';
         document.getElementById('sched-dow').value    = data.schedule_dow ?? 0;
         document.getElementById('sched-hour').value   = data.schedule_hour ?? 3;
         updateSchedUI();
+
+        const du = document.getElementById('disk-usage');
+        if (data.recordings_size != null) {
+            const free = data.disk_free != null ? ` · ${fmtBytes(data.disk_free)} free` : '';
+            du.textContent = `Recordings: ${fmtBytes(data.recordings_size)}${free}`;
+        }
+
         const footer = document.getElementById('settings-footer');
         if (data.conf_exists) {
             footer.textContent = 'Config: /etc/asterisk/scripts/cleanup-recordings/cleanup-recordings.conf';
@@ -389,6 +498,8 @@
                     '<p class="text-muted">No recordings found.</p>';
             } else {
                 buildContent(data);
+                document.getElementById('list-controls').style.display = '';
+                setInterval(refreshRecordings, 60000);
             }
 
             if (settings) populateSettings(settings);

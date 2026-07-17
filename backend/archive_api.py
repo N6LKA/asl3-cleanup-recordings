@@ -8,6 +8,7 @@ Converts GSM-encoded WAV files to PCM WAV on the fly for browser playback.
 import asyncio
 import os
 import re
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,22 @@ RUNNOW_FLAG      = Path("/tmp/allmon3-cleanup-runnow")
 
 _FILENAME_RE  = re.compile(r"^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})\d{4}\.WAV$", re.IGNORECASE)
 _SAFE_NAME_RE = re.compile(r"^[\w\-]+\.WAV$", re.IGNORECASE)
+_duration_cache: dict[str, float] = {}
+
+
+def _get_duration(wav: Path) -> float | None:
+    if wav.name in _duration_cache:
+        return _duration_cache[wav.name]
+    try:
+        result = subprocess.run(
+            [SOX_BIN, "--i", "-D", str(wav)],
+            capture_output=True, text=True, timeout=5,
+        )
+        dur = float(result.stdout.strip())
+        _duration_cache[wav.name] = dur
+        return dur
+    except Exception:
+        return None
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -129,6 +146,7 @@ async def list_recordings(request: Request):
             "date":     dt.strftime("%Y-%m-%d"),
             "time":     dt.strftime("%H:%M"),
             "size":     stat.st_size,
+            "duration": _get_duration(wav),
         })
     return JSONResponse(files)
 
@@ -138,6 +156,18 @@ async def get_settings(request: Request):
     if not await is_authenticated(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     conf = _read_cleanup_conf()
+
+    rec_size = sum(
+        f.stat().st_size for f in RECORDINGS_DIR.glob("*.WAV") if f.is_file()
+    ) if RECORDINGS_DIR.exists() else 0
+    disk_free = disk_total = None
+    try:
+        du = shutil.disk_usage(RECORDINGS_DIR if RECORDINGS_DIR.exists() else Path("/"))
+        disk_free  = du.free
+        disk_total = du.total
+    except Exception:
+        pass
+
     return JSONResponse({
         "days_to_keep":       int(conf.get("DAYS_TO_KEEP", 14)),
         "node":               conf.get("NODE", ""),
@@ -147,6 +177,9 @@ async def get_settings(request: Request):
         "schedule_hour":      int(conf.get("SCHEDULE_HOUR", 3)),
         "conf_exists":        CLEANUP_CONF.exists(),
         "script_exists":      CLEANUP_SCRIPT.exists(),
+        "recordings_size":    rec_size,
+        "disk_free":          disk_free,
+        "disk_total":         disk_total,
     })
 
 
